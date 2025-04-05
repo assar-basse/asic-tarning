@@ -17,10 +17,12 @@ END tt_um_example;
 
 ARCHITECTURE Behavioral OF tt_um_example IS
 
-    SIGNAL dice_value : unsigned(2 DOWNTO 0);
-    SIGNAL roll : STD_LOGIC;
+    SIGNAL dice_value : unsigned(3 DOWNTO 0);
+    SIGNAL dice_mode : unsigned(2 DOWNTO 0);
+    SIGNAL dice_select, dice_old, dice_op : STD_LOGIC;
+    signal dice_max : unsigned(5 downto 0);
+    
     SIGNAL seven_seg : STD_LOGIC_VECTOR(6 DOWNTO 0);
-    SIGNAL dice_mode : STD_LOGIC_VECTOR(2 DOWNTO 0);
     -- signal mux_counter : 
     -- dice value, from 1 to 6
     -- 7 segment display (0 to F)
@@ -29,6 +31,46 @@ ARCHITECTURE Behavioral OF tt_um_example IS
     -- 
 
 BEGIN
+
+    PROCESS (clk)
+    begin
+        if rst_n = '1' then
+            dice_select <= '0';
+        elsif rising_edge(clk) then
+            dice_select <= ui_in(1);
+            dice_old <= dice_select;
+        end if;
+    end process;
+
+    dice_op <= dice_select and not dice_old;
+
+    process(clk)
+    begin
+        IF rst_n = '1' THEN
+            dice_mode <= (others => '0');
+        elsif rising_edge(clk) then
+            if dice_op = '1' then
+                IF dice_mode >= 5 THEN
+                    dice_mode <= 0;
+                ELSE
+                    dice_mode <= dice_mode + 1;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    PROCESS (dice_mode)
+    BEGIN
+        CASE dice_mode IS            --abcdefg   
+            WHEN "000" => dice_max <= "000110"; -- D6
+            WHEN "001" => dice_max <= "000100"; -- D4
+            WHEN "010" => dice_max <= "001000"; -- D8
+            -- WHEN "011" => dice_max <= "001010"; -- D10
+            -- WHEN "100" => dice_max <= "001100"; -- D12
+            -- WHEN "101" => dice_max <= "010100"; -- D20
+            WHEN OTHERS => dice_max <= "111111";  --D255
+        END CASE;
+    END PROCESS;
 
     -- Increase the value of the die by 1 every clock cycle
     -- if value 6 is reached, next cycle will give 1
@@ -41,7 +83,7 @@ BEGIN
         ELSIF rising_edge(clk) THEN
         -- If receivning input from a button, increment the counter
             if ui_in(0) = '1' then
-                IF dice_value >= 6 THEN
+                IF dice_value >= dice_max THEN
                     dice_value <= 1;
                 ELSE
                     dice_value <= dice_value + 1;
@@ -53,16 +95,26 @@ BEGIN
     PROCESS (dice_value)
     BEGIN
         CASE dice_value IS            --abcdefg   
-            WHEN "001" => seven_seg <= "0110000"; -- 1
-            WHEN "010" => seven_seg <= "1101101"; -- 2
-            WHEN "011" => seven_seg <= "1111001"; -- 3
-            WHEN "100" => seven_seg <= "0110011"; -- 4
-            WHEN "101" => seven_seg <= "1011011"; -- 5
-            WHEN "110" => seven_seg <= "1011111"; -- 6
-            WHEN OTHERS => seven_seg <= "1111111";
+            WHEN "0001" => seven_seg <= "0110000"; -- 1
+            WHEN "0010" => seven_seg <= "1101101"; -- 2
+            WHEN "0011" => seven_seg <= "1111001"; -- 3
+            WHEN "0100" => seven_seg <= "0110011"; -- 4
+            WHEN "0101" => seven_seg <= "1011011"; -- 5
+            WHEN "0110" => seven_seg <= "1011111"; -- 6
+            WHEN "0111" => seven_seg <= "1110000"; -- 7
+            WHEN "1000" => seven_seg <= "1111111"; -- 8
+            WHEN OTHERS => seven_seg <= "0000001"; -- Minus
         END CASE;
     END PROCESS;
-        
+    
+
+    -- Multiplexed 7 segment displays
+    -- Muxes a set of 4 with a counter
+    -- case mux_dice is
+    -- when
+    -- seven_seg_out
+
+
     uo_out(6 DOWNTO 0) <= seven_seg;
     
 
@@ -80,10 +132,5 @@ BEGIN
     -- uo_out <= not (ui_in and uio_in);
     -- uio_out <= "00000000";
     -- uio_oe <= "00000000";
-
-    -- 
-    -- 
-    -- 
-    -- 
 
 END Behavioral;
