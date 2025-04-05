@@ -23,7 +23,7 @@ ARCHITECTURE Behavioral OF tt_um_example IS
     SIGNAL display_four : unsigned(7 DOWNTO 0);
     SIGNAL dice_value : unsigned(7 DOWNTO 0);
     SIGNAL dice_mode : unsigned(2 DOWNTO 0);
-    SIGNAL dice_amount : unsigned(1 DOWNTO 0);
+    SIGNAL dice_amount : unsigned(2 DOWNTO 0);
     SIGNAL dice_roll_pos : unsigned(1 DOWNTO 0);
     SIGNAL dice_mode_select, dice_mode_old, dice_mode_op : STD_LOGIC;
     SIGNAL dice_amount_select, dice_amount_old, dice_amount_op : STD_LOGIC;
@@ -31,6 +31,7 @@ ARCHITECTURE Behavioral OF tt_um_example IS
     SIGNAL dice_value_max : unsigned(5 DOWNTO 0);
     SIGNAL disp_mux_cntr : unsigned(1 DOWNTO 0);
     SIGNAL disp_mux_out : STD_LOGIC_VECTOR(3 DOWNTO 0);
+    signal to_display : std_logic_vector(7 downto 0);
 
     SIGNAL seven_seg : STD_LOGIC_VECTOR(6 DOWNTO 0);
 
@@ -84,7 +85,7 @@ BEGIN
         ELSIF rising_edge(clk) THEN
             IF dice_amount_op = '1' THEN
                 IF dice_amount >= 4 THEN
-                    dice_amount <= to_unsigned(1, 2);
+                    dice_amount <= to_unsigned(1, 3);
                 ELSE
                     dice_amount <= dice_amount + 1;
                 END IF;
@@ -168,22 +169,35 @@ BEGIN
         END CASE;
     END PROCESS;
 
-    uio_out(3 DOWNTO 0) <= disp_mux_out;
-
     process(dice_roll_pos)
     begin
         case dice_roll_pos is
-        when 0 => display_one <= dice_value;
-        when 1 => display_two <= dice_value;
-        when 2 => display_three <= dice_value;
-        when 3 => display_four <= dice_value;
+            when to_unsigned(0, 2) => display_one <= dice_value;
+            when to_unsigned(1, 2) => display_two <= dice_value;
+            when to_unsigned(2, 2) => display_three <= dice_value;
+            when to_unsigned(3, 2) => display_four <= dice_value;
+            when others => null;
         end case;
     end process;
 
-
-    PROCESS (dice_value)
+    PROCESS (disp_mux_cntr)
     BEGIN
-        CASE dice_value IS              --abcdefg   
+        CASE disp_mux_cntr IS
+            WHEN "00" => to_display <= display_one;
+            WHEN "01" => to_display <= display_two;
+            WHEN "10" => to_display <= display_three;
+            WHEN "11" => to_display <= display_four;
+            WHEN OTHERS => null;
+        END CASE;
+    END PROCESS;
+
+    uio_out(3 DOWNTO 0) <= disp_mux_out;
+
+
+
+    PROCESS (to_display)
+    BEGIN
+        CASE to_display IS              --abcdefg   
             WHEN "0001" => seven_seg <= "0110000"; -- 1
             WHEN "0010" => seven_seg <= "1101101"; -- 2
             WHEN "0011" => seven_seg <= "1111001"; -- 3
