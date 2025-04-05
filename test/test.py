@@ -31,11 +31,30 @@ async def test_project(dut):
 
     # Wait for one clock cycle to see the output values
     await ClockCycles(dut.clk, 1)
+    dut.rst_n.value = 0
 
     # The following assersion is just an example of how to check the output values.
     # Change it to match the actual expected output of your module:
     #assert dut.uo_out.value == 50
-    assert dut.uo_out.value == 255
+    # Test values  decimal / binary to decimal
+    # "0110000"; -- 1 / 48
+    # "1101101"; -- 2 / 109
+    # "1111001"; -- 3 / 121
+    # "0110011"; -- 4 / 51
+    # "1011011"; -- 5 / 91
+    # "1011111"; -- 6 / 95
+    # "1111111"; -- others / 127
 
+    await ClockCycles(dut.clk, 5)
+    assert dut.uo_out.value[1:7].integer == 91, f"{dut.uo_out.value = }"
+
+    # Wait 6 more cycles and expect the same result
+    await ClockCycles(dut.clk, 6)
+    assert dut.uo_out.value[1:7].integer == 91, f"{dut.uo_out.value = }"
+
+    await ClockCycles(dut.clk, 1)
+    assert dut.uo_out.value[1:7].integer == 95, f"{dut.uo_out.value = }"
+    await ClockCycles(dut.clk, 1)
+    assert dut.uo_out.value[1:7].integer == 48, f"{dut.uo_out.value = }"
     # Keep testing the module by changing the input values, waiting for
     # one or more clock cycles, and asserting the expected output values.
