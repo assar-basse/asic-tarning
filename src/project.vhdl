@@ -30,9 +30,6 @@ ARCHITECTURE Behavioral OF tt_um_example IS
 
 BEGIN
 
-    -- If receivning input from a button, stop the counter
-    -- process(clk)
-
     -- Increase the value of the die by 1 every clock cycle
     -- if value 6 is reached, next cycle will give 1
     -- if reset is triggered, restore die counter to 1
@@ -40,13 +37,16 @@ BEGIN
     BEGIN
         IF rst_n = '1' THEN
             dice_value <= 1;
-            seven_seg <= "1111111";
+            seven_seg <= "0110000";
         ELSIF rising_edge(clk) THEN
-            IF dice_value >= 6 THEN
-                dice_value <= 1;
-            ELSE
-                dice_value <= dice_value + 1;
-            END IF;
+        -- If receivning input from a button, increment the counter
+            if ui_in(0) = '1' then
+                IF dice_value >= 6 THEN
+                    dice_value <= 1;
+                ELSE
+                    dice_value <= dice_value + 1;
+                end if;
+            end if;
         END IF;
     END PROCESS;
 
@@ -63,8 +63,6 @@ BEGIN
         END CASE;
     END PROCESS;
         
-    -- uo_out(2 downto 0) <= dice_value;
-    -- out_out(7 downto 6) <= (others => '0');
     uo_out(6 DOWNTO 0) <= seven_seg;
     
 
