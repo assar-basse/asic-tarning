@@ -17,58 +17,91 @@ END tt_um_example;
 
 ARCHITECTURE Behavioral OF tt_um_example IS
 
-    SIGNAL dice_value : unsigned(3 DOWNTO 0);
+    SIGNAL display_one : unsigned(7 DOWNTO 0);
+    SIGNAL display_two : unsigned(7 DOWNTO 0);
+    SIGNAL display_three : unsigned(7 DOWNTO 0);
+    SIGNAL display_four : unsigned(7 DOWNTO 0);
+    SIGNAL dice_value : unsigned(7 DOWNTO 0);
     SIGNAL dice_mode : unsigned(2 DOWNTO 0);
-    SIGNAL dice_select, dice_old, dice_op : STD_LOGIC;
-    signal dice_max : unsigned(5 downto 0);
-    
+    SIGNAL dice_amount : unsigned(1 DOWNTO 0);
+    SIGNAL dice_roll_pos : unsigned(1 DOWNTO 0);
+    SIGNAL dice_mode_select, dice_mode_old, dice_mode_op : STD_LOGIC;
+    SIGNAL dice_amount_select, dice_amount_old, dice_amount_op : STD_LOGIC;
+    SIGNAL dice_roll_select, dice_roll_old, dice_roll_op : STD_LOGIC;
+    SIGNAL dice_value_max : unsigned(5 DOWNTO 0);
+    SIGNAL disp_mux_cntr : unsigned(1 DOWNTO 0);
+    SIGNAL disp_mux_out : STD_LOGIC_VECTOR(3 DOWNTO 0);
+
     SIGNAL seven_seg : STD_LOGIC_VECTOR(6 DOWNTO 0);
-    -- signal mux_counter : 
-    -- dice value, from 1 to 6
-    -- 7 segment display (0 to F)
-    -- roll, std_logic (meant to be toggled and switch the state)
-    -- dice_value (vector 2 downto 0) (8 different)
-    -- 
 
 BEGIN
 
+    -- Synchronize signals
     PROCESS (clk)
-    begin
-        if rst_n = '1' then
-            dice_select <= '0';
-        elsif rising_edge(clk) then
-            dice_select <= ui_in(1);
-            dice_old <= dice_select;
-        end if;
-    end process;
-
-    dice_op <= dice_select and not dice_old;
-
-    process(clk)
-    begin
+    BEGIN
         IF rst_n = '1' THEN
-            dice_mode <= (others => '0');
-        elsif rising_edge(clk) then
-            if dice_op = '1' then
-                IF dice_mode >= 5 THEN
-                    dice_mode <= 0;
+            dice_roll_select <= '0';
+            dice_mode_select <= '0';
+            dice_amount_select <= '0';
+        ELSIF rising_edge(clk) THEN
+
+            dice_roll_select <= ui_in(0);
+            dice_roll_old <= dice_roll_select;
+            dice_mode_select <= ui_in(1);
+            dice_mode_old <= dice_mode_select;
+            dice_amount_select <= ui_in(2);
+            dice_amount_old <= dice_amount_select;
+
+        END IF;
+    END PROCESS;
+
+    dice_roll_op <= dice_roll_select AND NOT dice_roll_old;
+    dice_amount_op <= dice_amount_select AND NOT dice_amount_old;
+    dice_mode_op <= dice_mode_select AND NOT dice_mode_old;
+
+    -- Dice mode selection process
+    PROCESS (clk)
+    BEGIN
+        IF rst_n = '1' THEN
+            dice_mode <= (OTHERS => '0');
+        ELSIF rising_edge(clk) THEN
+            IF dice_mode_op = '1' THEN
+                -- FIXME: Temporarily set to 2 before enabling higher dice
+                IF dice_mode >= 2 THEN
+                    dice_mode <= to_unsigned(0, 3);
                 ELSE
                     dice_mode <= dice_mode + 1;
-                end if;
-            end if;
-        end if;
-    end process;
+                END IF;
+            END IF;
+        END IF;
+    END PROCESS;
+
+    -- No. of dice selection process
+    PROCESS (clk)
+    BEGIN
+        IF rst_n = '1' THEN
+            dice_amount <= "1";
+        ELSIF rising_edge(clk) THEN
+            IF dice_amount_op = '1' THEN
+                IF dice_amount >= 4 THEN
+                    dice_amount <= to_unsigned(1, 2);
+                ELSE
+                    dice_amount <= dice_amount + 1;
+                END IF;
+            END IF;
+        END IF;
+    END PROCESS;
 
     PROCESS (dice_mode)
     BEGIN
-        CASE dice_mode IS            --abcdefg   
-            WHEN "000" => dice_max <= "000110"; -- D6
-            WHEN "001" => dice_max <= "000100"; -- D4
-            WHEN "010" => dice_max <= "001000"; -- D8
-            -- WHEN "011" => dice_max <= "001010"; -- D10
-            -- WHEN "100" => dice_max <= "001100"; -- D12
-            -- WHEN "101" => dice_max <= "010100"; -- D20
-            WHEN OTHERS => dice_max <= "111111";  --D255
+        CASE dice_mode IS --abcdefg   
+            WHEN "000" => dice_value_max <= "000110"; -- D6
+            WHEN "001" => dice_value_max <= "000100"; -- D4
+            WHEN "010" => dice_value_max <= "001000"; -- D8
+                -- WHEN "011" => dice_value_max <= "001010"; -- D10
+                -- WHEN "100" => dice_value_max <= "001100"; -- D12
+                -- WHEN "101" => dice_value_max <= "010100"; -- D20
+            WHEN OTHERS => dice_value_max <= "111111"; --D255
         END CASE;
     END PROCESS;
 
@@ -81,20 +114,76 @@ BEGIN
             dice_value <= 1;
             seven_seg <= "0110000";
         ELSIF rising_edge(clk) THEN
-        -- If receivning input from a button, increment the counter
-            if ui_in(0) = '1' then
-                IF dice_value >= dice_max THEN
-                    dice_value <= 1;
+            -- If receivning input from a button, increment the counter
+            -- This cannot be synchronized as a variable
+            IF ui_in(0) = '1' THEN
+                IF dice_value >= dice_value_max THEN
+                    dice_value <= to_unsigned(1, 8);
                 ELSE
                     dice_value <= dice_value + 1;
-                end if;
-            end if;
+                END IF;
+            END IF;
+        END IF;
+    END PROCESS;
+    -- Roll multiple dice
+    PROCESS (clk)
+    BEGIN
+        IF rst_n = '1' THEN
+            dice_roll_pos <= '0';
+
+        ELSIF rising_edge(clk) THEN
+            IF dice_roll_op = '1' THEN
+                IF dice_roll_pos >= dice_amount THEN
+                    dice_roll_pos <= to_unsigned(0, 2);
+                ELSE
+                    dice_roll_pos <= dice_roll_pos + 1;
+                END IF;
+            END IF;
         END IF;
     END PROCESS;
 
+
+    -- 2-bit (4 decimal) counter for multiplexing which seven segment display to show
+    PROCESS (clk) BEGIN
+        IF (rst_n = '1') THEN
+            disp_mux_cntr <= (OTHERS => '0');
+        ELSIF rising_edge(clk) THEN
+            IF disp_mux_cntr >= dice_amount THEN
+                disp_mux_cntr <= (OTHERS => '0');
+            ELSE
+                disp_mux_cntr <= disp_mux_cntr + 1;
+            END IF;
+        END IF;
+    END PROCESS;
+
+    -- FIXME: Add a separate clock for the mux signal, otherwise it will clock itself to death
+    PROCESS (disp_mux_cntr)
+    BEGIN
+        CASE disp_mux_cntr IS
+            WHEN "00" => disp_mux_out <= "0001";
+            WHEN "01" => disp_mux_out <= "0010";
+            WHEN "10" => disp_mux_out <= "0100";
+            WHEN "11" => disp_mux_out <= "1000";
+            WHEN OTHERS => disp_mux_out <= "0000";
+        END CASE;
+    END PROCESS;
+
+    uio_out(3 DOWNTO 0) <= disp_mux_out;
+
+    process(dice_roll_pos)
+    begin
+        case dice_roll_pos is
+        when 0 => display_one <= dice_value;
+        when 1 => display_two <= dice_value;
+        when 2 => display_three <= dice_value;
+        when 3 => display_four <= dice_value;
+        end case;
+    end process;
+
+
     PROCESS (dice_value)
     BEGIN
-        CASE dice_value IS            --abcdefg   
+        CASE dice_value IS              --abcdefg   
             WHEN "0001" => seven_seg <= "0110000"; -- 1
             WHEN "0010" => seven_seg <= "1101101"; -- 2
             WHEN "0011" => seven_seg <= "1111001"; -- 3
@@ -106,31 +195,8 @@ BEGIN
             WHEN OTHERS => seven_seg <= "0000001"; -- Minus
         END CASE;
     END PROCESS;
-    
-
-    -- Multiplexed 7 segment displays
-    -- Muxes a set of 4 with a counter
-    -- case mux_dice is
-    -- when
-    -- seven_seg_out
-
 
     uo_out(6 DOWNTO 0) <= seven_seg;
-    
 
-
-    -- "1111000" when HEX="0111" else--7
-    -- "0000000" when HEX="1000" else--8
-    -- "0010000" when HEX="1001" else--9
-    -- "0001000" when HEX="1010" else--A
-    -- "0000011" when HEX="1011" else--b
-    -- "1000110" when HEX="1100" else--C
-    -- "0100001" when HEX="1101" else--d
-    -- "0000110" when HEX="1110" else--E
-    -- "0001110" when HEX="1111" else--F
-    --uo_out <= std_logic_vector(unsigned(ui_in) + unsigned(uio_in));
-    -- uo_out <= not (ui_in and uio_in);
-    -- uio_out <= "00000000";
-    -- uio_oe <= "00000000";
 
 END Behavioral;
